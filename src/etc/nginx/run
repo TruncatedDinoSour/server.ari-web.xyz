@@ -5,7 +5,7 @@ set -e
 
 main() {
     chmod 777 -R /var/www/ari-web
-    uwcgi --immediate-uid 33 --uid 33 --immediate-gid 33 --gid 33 --ini /etc/nginx/uwcgi.ini
+    uwsgi --immediate-uid 33 --uid 33 --immediate-gid 33 --gid 33 --ini /etc/nginx/uwcgi.ini
 }
 
 main "$@"
