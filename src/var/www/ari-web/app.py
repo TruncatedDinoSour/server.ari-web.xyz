@@ -100,6 +100,11 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
     )
 
 
+@app.get("/total")
+def total() -> str:
+    return str(SESSION.query(Comment.cid).count())
+
+
 @app.get("/")
 def index() -> str:
     return "this is the comment section api for ari-web"
