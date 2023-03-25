@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=root
-Group=root
+Group=www-data
 WorkingDirectory=/var/www/ari-web
 Environment=”PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin”
 ExecStart=/etc/nginx/run
