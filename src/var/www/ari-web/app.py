@@ -127,7 +127,7 @@ def sitemap() -> WResponse:
 
 @app.get("/robots.txt")
 def robots() -> WResponse:
-    return redirect("https://ari-web.xyz/sitemap.robots")
+    return redirect("https://ari-web.xyz/robots.txt")
 
 
 def main() -> int:
