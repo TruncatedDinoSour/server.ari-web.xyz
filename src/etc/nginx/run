@@ -4,8 +4,10 @@
 set -e
 
 main() {
+    cd /etc/nginx/
+
     chmod 777 -R /var/www/ari-web
-    uwsgi --ini /etc/nginx/uwsgi.ini
+    uwsgi --ini uwsgi.ini
 }
 
 main "$@"
