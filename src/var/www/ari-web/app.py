@@ -57,7 +57,7 @@ def limit_requests() -> None:
 
 @app.after_request
 def after_request(response):
-    request.headers.update(getattr(g, "headers", {}))
+    response.headers.extend(getattr(g, "headers", {}))
 
     response.headers.update(
         {
@@ -96,6 +96,11 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
             .all()
         }
     )
+
+
+@app.get("/")
+def index() -> str:
+    return "this is the comment section api for ari-web"
 
 
 def main() -> int:
