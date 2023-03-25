@@ -57,7 +57,7 @@ def limit_requests() -> None:
 
 @app.after_request
 def after_request(response):
-    request.headers.extend(getattr(g, "headers", {}))
+    request.headers.update(getattr(g, "headers", {}))
 
     response.headers.update(
         {

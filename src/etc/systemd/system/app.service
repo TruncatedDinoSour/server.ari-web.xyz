@@ -5,9 +5,9 @@ After=network.target
 [Service]
 User=root
 Group=www-data
-WorkingDirectory=/var/www/ari-web
+WorkingDirectory=/etc/nginx
 Environment=”PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin”
-ExecStart=/etc/nginx/run
+ExecStart=./run
 
 [Install]
 WantedBy=multi-user.target
