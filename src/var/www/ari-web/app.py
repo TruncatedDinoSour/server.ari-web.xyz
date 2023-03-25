@@ -20,6 +20,9 @@ ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(
 BASE: typing.Any = declarative_base()
 SESSION: Session = sqlalchemy.orm.Session(ENGINE)
 
+MAX_CONTENT_LEN: int = 1024
+MAX_AUTHOR_LEN: int = 100
+
 
 class Comment(BASE):  # type: ignore
     __tablename__: str = "comments"
@@ -27,8 +30,12 @@ class Comment(BASE):  # type: ignore
     cid: sqlalchemy.Column[int] = sqlalchemy.Column(
         sqlalchemy.Integer, primary_key=True
     )
-    content: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String(1024))
-    author: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String(100))
+    content: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String(MAX_CONTENT_LEN)
+    )
+    author: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String(MAX_AUTHOR_LEN)
+    )
 
     def __init__(self, content: str, author: str) -> None:
         self.content = content  # type: ignore
@@ -86,7 +93,7 @@ def add_comment() -> typing.Tuple[str, int]:
         return "no valid comment provided", 400
 
     try:
-        SESSION.add((sql_obj := Comment(comment["content"], comment["author"])))  # type: ignore
+        SESSION.add((sql_obj := Comment(comment["content"][:MAX_CONTENT_LEN], comment["author"][:MAX_AUTHOR_LEN])))  # type: ignore
         SESSION.commit()
     except Exception as e:
         return f"sql error : {e}", 500
