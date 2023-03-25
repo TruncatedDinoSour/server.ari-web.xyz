@@ -7,7 +7,7 @@ main() {
     cd /var/www/ari-web
 
     chmod 777 -R /var/www/ari-web
-    uwsgi --ini /etc/nginx/uwsgi.ini &
+    uwsgi --ini /etc/nginx/uwsgi.ini
 }
 
 main "$@"
