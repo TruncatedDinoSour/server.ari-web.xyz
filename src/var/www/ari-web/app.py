@@ -65,6 +65,12 @@ def after_request(response: Response) -> Response:
         {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET,POST",
+            "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+            "X-Frame-Options": "deny",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "upgrade-insecure-requests",
+            "X-Permitted-Cross-Domain-Policies": "none",
+            "Referrer-Policy": "no-referrer",
         }
     )
 
