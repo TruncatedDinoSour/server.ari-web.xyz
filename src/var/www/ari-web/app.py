@@ -8,9 +8,11 @@ from secrets import SystemRandom
 from warnings import filterwarnings as filter_warnings
 
 import sqlalchemy  # type: ignore
-from flask import Flask, Response, g, jsonify, request  # type: ignore
+from flask import (Flask, Response, g, jsonify, redirect,  # type: ignore
+                   request)
 from flask_limit import RateLimiter  # type: ignore
 from sqlalchemy.orm import Session, declarative_base  # type: ignore
+from werkzeug.wrappers.response import Response as WResponse
 
 ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(
     "sqlite:///ari-web-comments.db?check_same_thread=False"
@@ -38,7 +40,7 @@ BASE.metadata.create_all(ENGINE)
 
 app: Flask = Flask(__name__)
 
-app.config.update(
+app.config.update(  # type: ignore
     {
         "RATELIMITE_LIMIT": 15,
         "RATELIMITE_PERIOD": 10,
@@ -50,13 +52,13 @@ limiter: RateLimiter = RateLimiter(app)
 
 
 @app.before_request
-@limiter.rate_limit
+@limiter.rate_limit  # type: ignore
 def limit_requests() -> None:
     pass
 
 
-@app.after_request
-def after_request(response):
+@app.after_request  # type: ignore
+def after_request(response: Response) -> Response:
     response.headers.extend(getattr(g, "headers", {}))
 
     response.headers.update(
@@ -78,7 +80,7 @@ def add_comment() -> typing.Tuple[str, int]:
         return "no valid comment provided", 400
 
     try:
-        SESSION.add((sql_obj := Comment(comment["content"], comment["author"])))
+        SESSION.add((sql_obj := Comment(comment["content"], comment["author"])))  # type: ignore
         SESSION.commit()
     except Exception as e:
         return f"sql error : {e}", 500
@@ -91,7 +93,7 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
     return jsonify(
         {
             c.cid: [c.author, c.content]
-            for c in SESSION.query(Comment)
+            for c in SESSION.query(Comment)  # type: ignore
             .filter(Comment.cid >= cid_from, Comment.cid <= cid_to)
             .all()
         }
@@ -101,6 +103,26 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
 @app.get("/")
 def index() -> str:
     return "this is the comment section api for ari-web"
+
+
+@app.get("/git")
+def git() -> WResponse:
+    return redirect("https://ari-web.xyz/gh/server.ari-web.xyz")
+
+
+@app.get("/favicon.ico")
+def favicon() -> WResponse:
+    return redirect("https://ari-web.xyz/favicon.ico")
+
+
+@app.get("/sitemap.xml")
+def sitemap() -> WResponse:
+    return redirect("https://ari-web.xyz/sitemap.xml")
+
+
+@app.get("/robots.txt")
+def robots() -> WResponse:
+    return redirect("https://ari-web.xyz/sitemap.robots")
 
 
 def main() -> int:
