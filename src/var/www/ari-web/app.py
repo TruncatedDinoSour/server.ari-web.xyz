@@ -85,20 +85,20 @@ def after_request(response: Response) -> Response:
 
 
 @app.post("/")
-def add_comment() -> typing.Tuple[str, int]:
+def add_comment() -> Response:
     comment: typing.Any = request.values
     sql_obj: Comment
 
     if not all(comment.get(k) for k in ("content", "author")):
-        return "no valid comment provided", 400
+        return Response("no valid comment provided", 400, mimetype="text/plain")
 
     try:
         SESSION.add((sql_obj := Comment(comment["content"][:MAX_CONTENT_LEN], comment["author"][:MAX_AUTHOR_LEN])))  # type: ignore
         SESSION.commit()
     except Exception as e:
-        return f"sql error : {e}", 500
+        return Response(f"sql error : {e}", 500, mimetype="text/plain")
 
-    return str(sql_obj.cid), 200
+    return Response(str(sql_obj.cid), mimetype="text/plain")
 
 
 @app.get("/<int:cid_from>/<int:cid_to>")
@@ -114,13 +114,15 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
 
 
 @app.get("/total")
-def total() -> str:
-    return str(SESSION.query(Comment.cid).count())
+def total() -> Response:
+    return Response(str(SESSION.query(Comment.cid).count()), mimetype="text/plain")
 
 
 @app.get("/")
-def index() -> str:
-    return "this is the comment section api for ari-web"
+def index() -> Response:
+    return Response(
+        "this is the comment section api for ari-web", mimetype="text/plain"
+    )
 
 
 @app.get("/git")
