@@ -89,11 +89,14 @@ def add_comment() -> Response:
     comment: typing.Any = request.values
     sql_obj: Comment
 
-    if not all(comment.get(k) for k in ("content", "author")):
+    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
+    author: str = comment.get("author", "").strip()[:MAX_AUTHOR_LEN]
+
+    if not all((content, author)):
         return Response("no valid comment provided", 400, mimetype="text/plain")
 
     try:
-        SESSION.add((sql_obj := Comment(comment["content"][:MAX_CONTENT_LEN], comment["author"][:MAX_AUTHOR_LEN])))  # type: ignore
+        SESSION.add((sql_obj := Comment(content, author)))  # type: ignore
         SESSION.commit()
     except Exception as e:
         return Response(f"sql error : {e}", 500, mimetype="text/plain")
