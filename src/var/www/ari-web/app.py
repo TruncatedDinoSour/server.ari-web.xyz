@@ -128,7 +128,7 @@ def total() -> Response:
 @app.get("/git/<path:path>")
 def git(path: typing.Optional[str]) -> WResponse:
     return redirect(
-        f"https://ari-web.xyz/gh/user.ari-web.xyz/{path or ''}?{urlencode(request.args.to_dict())}"
+        f"https://ari-web.xyz/gh/server.ari-web.xyz/{path or ''}?{urlencode(request.args.to_dict())}"
     )
 
 
