@@ -25,6 +25,10 @@ MAX_CONTENT_LEN: int = 1024
 MAX_AUTHOR_LEN: int = 100
 
 
+def text(text: str, code: int = 200) -> Response:
+    return Response(text, code, mimetype="text/plain")
+
+
 class Comment(BASE):  # type: ignore
     __tablename__: str = "comments"
 
@@ -57,10 +61,6 @@ app.config.update(  # type: ignore
 )
 
 limiter: RateLimiter = RateLimiter(app)
-
-
-def text(text: str, code: int = 200) -> Response:
-    return Response(text, code, mimetype="text/plain")
 
 
 @app.before_request
@@ -123,15 +123,6 @@ def total() -> Response:
     return text(str(SESSION.query(Comment.cid).count()))
 
 
-@app.get("/", defaults={"path": None})
-@app.get("/git", defaults={"path": None})
-@app.get("/git/<path:path>")
-def git(path: typing.Optional[str]) -> WResponse:
-    return redirect(
-        f"https://ari-web.xyz/gh/server.ari-web.xyz/{path or ''}?{urlencode(request.args.to_dict())}"
-    )
-
-
 @app.get("/favicon.ico")
 def favicon() -> WResponse:
     return redirect("https://ari-web.xyz/favicon.ico")
@@ -145,6 +136,16 @@ def sitemap() -> WResponse:
 @app.get("/robots.txt")
 def robots() -> WResponse:
     return redirect("https://ari-web.xyz/robots.txt")
+
+
+@app.get("/", defaults={"path": None})
+@app.get("/git", defaults={"path": None})
+@app.get("/<path:path>")
+@app.get("/git/<path:path>")
+def git(path: typing.Optional[str]) -> WResponse:
+    return redirect(
+        f"https://ari-web.xyz/gh/server.ari-web.xyz/{path or ''}?{urlencode(request.args.to_dict())}"
+    )
 
 
 def main() -> int:
