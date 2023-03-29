@@ -6,5 +6,5 @@
 
 -   POST / -- post a comment
     -   data : `author`, `content`
--   GET /<from>/<to> -- get comments with IDs in range of from to to
+-   GET /\<from\>/\<to\> -- get comments with IDs in range of from to to
 -   GET /total -- total comments count
