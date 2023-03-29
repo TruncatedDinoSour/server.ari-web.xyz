@@ -5,11 +5,12 @@
 import string
 import typing
 from secrets import SystemRandom
+from urllib.parse import urlencode
 from warnings import filterwarnings as filter_warnings
 
 import sqlalchemy  # type: ignore
-from flask import (Flask, Response, g, jsonify, redirect,  # type: ignore
-                   request)
+from flask import redirect  # type: ignore
+from flask import Flask, Response, g, jsonify, request
 from flask_limit import RateLimiter  # type: ignore
 from sqlalchemy.orm import Session, declarative_base  # type: ignore
 from werkzeug.wrappers.response import Response as WResponse
@@ -18,7 +19,7 @@ ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(
     "sqlite:///ari-web-comments.db?check_same_thread=False"
 )
 BASE: typing.Any = declarative_base()
-SESSION: Session = sqlalchemy.orm.Session(ENGINE)
+SESSION: Session = sqlalchemy.orm.Session(ENGINE)  # type: ignore
 
 MAX_CONTENT_LEN: int = 1024
 MAX_AUTHOR_LEN: int = 100
@@ -58,6 +59,10 @@ app.config.update(  # type: ignore
 limiter: RateLimiter = RateLimiter(app)
 
 
+def text(text: str, code: int = 200) -> Response:
+    return Response(text, code, mimetype="text/plain")
+
+
 @app.before_request
 @limiter.rate_limit  # type: ignore
 def limit_requests() -> None:
@@ -93,15 +98,12 @@ def add_comment() -> Response:
     author: str = comment.get("author", "").strip()[:MAX_AUTHOR_LEN]
 
     if not all((content, author)):
-        return Response("no valid comment provided", 400, mimetype="text/plain")
+        return text("no valid comment provided", 400)
 
-    try:
-        SESSION.add((sql_obj := Comment(content, author)))  # type: ignore
-        SESSION.commit()
-    except Exception as e:
-        return Response(f"sql error : {e}", 500, mimetype="text/plain")
+    SESSION.add((sql_obj := Comment(content, author)))  # type: ignore
+    SESSION.commit()
 
-    return Response(str(sql_obj.cid), mimetype="text/plain")
+    return text(str(sql_obj.cid))
 
 
 @app.get("/<int:cid_from>/<int:cid_to>")
@@ -118,19 +120,16 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
 
 @app.get("/total")
 def total() -> Response:
-    return Response(str(SESSION.query(Comment.cid).count()), mimetype="text/plain")
+    return text(str(SESSION.query(Comment.cid).count()))
 
 
-@app.get("/")
-def index() -> Response:
-    return Response(
-        "this is the comment section api for ari-web", mimetype="text/plain"
+@app.get("/", defaults={"path": None})
+@app.get("/git", defaults={"path": None})
+@app.get("/git/<path:path>")
+def git(path: typing.Optional[str]) -> WResponse:
+    return redirect(
+        f"https://ari-web.xyz/gh/user.ari-web.xyz/{path or ''}?{urlencode(request.args.to_dict())}"
     )
-
-
-@app.get("/git")
-def git() -> WResponse:
-    return redirect("https://ari-web.xyz/gh/server.ari-web.xyz")
 
 
 @app.get("/favicon.ico")
