@@ -54,8 +54,8 @@ app: Flask = Flask(__name__)
 
 app.config.update(  # type: ignore
     {
-        "RATELIMITE_LIMIT": 15,
-        "RATELIMITE_PERIOD": 10,
+        "RATELIMITE_LIMIT": 10,
+        "RATELIMITE_PERIOD": 50,
         "SECRET_KEY": "".join(SystemRandom().choices(string.printable, k=8192)),
     }
 )
