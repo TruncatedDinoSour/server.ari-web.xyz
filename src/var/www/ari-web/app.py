@@ -4,6 +4,7 @@
 
 import string
 import typing
+from datetime import datetime
 from secrets import SystemRandom
 from urllib.parse import urlencode
 from warnings import filterwarnings as filter_warnings
@@ -27,6 +28,16 @@ MAX_AUTHOR_LEN: int = 100
 
 def text(text: str, code: int = 200) -> Response:
     return Response(text, code, mimetype="text/plain")
+
+
+def censor_text(text: str) -> str:
+    return (
+        hex(
+            (sum(map(lambda c: (ord(c) << 1) + MAX_AUTHOR_LEN, text)) << 5)
+            + MAX_CONTENT_LEN
+        )
+        + "f"
+    )
 
 
 class Comment(BASE):  # type: ignore
@@ -138,6 +149,30 @@ def robots() -> WResponse:
     return redirect("https://ari-web.xyz/robots.txt")
 
 
+@app.route("/censor", methods=["POST"])
+def censor_comment() -> typing.Tuple[str, int]:
+    if (
+        request.remote_addr != "127.0.0.1"
+        or not request.json
+        or not all(k in request.json for k in ("id", "reason"))
+    ):
+        return "", 400
+
+    user: typing.Optional[Comment] = (  # type: ignore
+        SESSION.query(Comment).where(Comment.cid == request.json["id"]).first()  # type: ignore
+    )
+
+    if user is None:
+        return "", 404
+
+    user.author = f"{censor_text(user.author)}"  # type: ignore
+    user.content = f"[ {censor_text(user.content)} censored at [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
+
+    SESSION.commit()  # type: ignore
+
+    return "", 200
+
+
 @app.get("/", defaults={"path": None})
 @app.get("/git", defaults={"path": None})
 @app.get("/<path:path>")
@@ -151,7 +186,7 @@ def git(path: typing.Optional[str]) -> WResponse:
 def main() -> int:
     """entry / main function"""
 
-    app.run("0.0.0.0")
+    app.run("0.0.0.0", debug=True)
 
     return 0
 
