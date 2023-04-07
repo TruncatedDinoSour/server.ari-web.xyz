@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""censor comments"""
+
+import sys
+from warnings import filterwarnings as filter_warnings
+
+import requests
+
+
+def main() -> int:
+    """entry / main function"""
+
+    try:
+        print(
+            requests.post(
+                "https://127.0.0.1/censor",
+                json={"id": int(sys.argv[1]), "reason": sys.argv[2]},
+                verify=False,
+            ).status_code
+        )
+    except (IndexError, ValueError):
+        print(-1)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    assert main.__annotations__.get("return") is int, "main() should return an integer"
+
+    filter_warnings("error", category=Warning)
+    raise SystemExit(main())

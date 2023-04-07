@@ -154,7 +154,7 @@ def censor_comment() -> typing.Tuple[str, int]:
     if (
         request.remote_addr != "127.0.0.1"
         or not request.json
-        or not all(k in request.json for k in ("id", "reason"))
+        or "id" not in request.json
     ):
         return "", 400
 
@@ -165,8 +165,10 @@ def censor_comment() -> typing.Tuple[str, int]:
     if user is None:
         return "", 404
 
-    user.author = f"{censor_text(user.author)}"  # type: ignore
-    user.content = f"[ {censor_text(user.content)} censored at [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
+    user.author = censor_text(user.author)  # type: ignore
+    user.content = f"[ {censor_text(user.content)} censored at \
+[ {datetime.utcnow()} UTC ] due to \
+[ {request.json.get('reason', '').strip() or 'no reason provided'} ] ]"
 
     SESSION.commit()  # type: ignore
 
