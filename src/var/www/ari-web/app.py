@@ -156,7 +156,7 @@ def censor_comment() -> typing.Tuple[str, int]:
         return "", 404
 
     user.author = censor_text(user.author)  # type: ignore
-    user.content = f"[ {censor_text(user.content)} censored at [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
+    user.content = f"[ {censor_text(user.content)} censored on [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
 
     SESSION.commit()  # type: ignore
 
