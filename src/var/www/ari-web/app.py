@@ -134,6 +134,35 @@ def total() -> Response:
     return text(str(SESSION.query(Comment.cid).count()))
 
 
+@app.route("/censor", methods=["POST"])
+def censor_comment() -> typing.Tuple[str, int]:
+    if (
+        request.remote_addr != "127.0.0.1"
+        or not request.json
+        or not all(k in request.json for k in ("id", "reason"))
+    ):
+        return "", 400
+
+    request.json["reason"] = request.json["reason"].strip()
+
+    if not request.json["reason"]:
+        return "", 400
+
+    user: typing.Optional[Comment] = (  # type: ignore
+        SESSION.query(Comment).where(Comment.cid == request.json["id"]).first()  # type: ignore
+    )
+
+    if user is None:
+        return "", 404
+
+    user.author = censor_text(user.author)  # type: ignore
+    user.content = f"[ {censor_text(user.content)} censored at [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
+
+    SESSION.commit()  # type: ignore
+
+    return "", 200
+
+
 @app.get("/favicon.ico")
 def favicon() -> WResponse:
     return redirect("https://ari-web.xyz/favicon.ico")
@@ -147,32 +176,6 @@ def sitemap() -> WResponse:
 @app.get("/robots.txt")
 def robots() -> WResponse:
     return redirect("https://ari-web.xyz/robots.txt")
-
-
-@app.route("/censor", methods=["POST"])
-def censor_comment() -> typing.Tuple[str, int]:
-    if (
-        request.remote_addr != "127.0.0.1"
-        or not request.json
-        or "id" not in request.json
-    ):
-        return "", 400
-
-    user: typing.Optional[Comment] = (  # type: ignore
-        SESSION.query(Comment).where(Comment.cid == request.json["id"]).first()  # type: ignore
-    )
-
-    if user is None:
-        return "", 404
-
-    user.author = censor_text(user.author)  # type: ignore
-    user.content = f"[ {censor_text(user.content)} censored at \
-[ {datetime.utcnow()} UTC ] due to \
-[ {request.json.get('reason', '').strip() or 'no reason provided'} ] ]"
-
-    SESSION.commit()  # type: ignore
-
-    return "", 200
 
 
 @app.get("/", defaults={"path": None})
