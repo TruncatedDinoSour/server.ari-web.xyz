@@ -15,7 +15,7 @@ def main() -> int:
         print(
             requests.post(
                 "https://127.0.0.1/censor",
-                json={"id": int(sys.argv[1]), "reason": sys.argv[2]},
+                data={"id": int(sys.argv[1].strip()), "reason": sys.argv[2].strip()},
                 verify=False,
             ).status_code
         )

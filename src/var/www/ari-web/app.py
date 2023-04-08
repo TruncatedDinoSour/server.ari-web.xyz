@@ -102,7 +102,7 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
-    comment: typing.Any = request.values
+    comment: typing.Dict[str, str] = request.values
     sql_obj: Comment
 
     content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
@@ -134,29 +134,26 @@ def total() -> Response:
     return text(str(SESSION.query(Comment.cid).count()))
 
 
-@app.route("/censor", methods=["POST"])
+@app.post("/censor")
 def censor_comment() -> typing.Tuple[str, int]:
-    if (
-        request.remote_addr != "127.0.0.1"
-        or not request.json
-        or not all(k in request.json for k in ("id", "reason"))
-    ):
-        return "", 400
+    censor: typing.Dict[str, str] = request.values
 
-    request.json["reason"] = request.json["reason"].strip()
-
-    if not request.json["reason"]:
+    if request.remote_addr != "127.0.0.1":
+        return "", 403
+    elif not all(k in censor for k in ("id", "reason")):
         return "", 400
+    elif not (reason := censor["reason"].strip()):
+        return "", 422
 
     user: typing.Optional[Comment] = (  # type: ignore
-        SESSION.query(Comment).where(Comment.cid == request.json["id"]).first()  # type: ignore
+        SESSION.query(Comment).where(Comment.cid == censor["id"]).first()  # type: ignore
     )
 
     if user is None:
         return "", 404
 
     user.author = censor_text(user.author)  # type: ignore
-    user.content = f"[ {censor_text(user.content)} censored on [ {datetime.utcnow()} UTC ] due to [ {request.json['reason']} ] ]"  # type: ignore
+    user.content = f"[ {censor_text(user.content)} censored on [ {datetime.utcnow()} UTC ] due to [ {reason} ] ]"  # type: ignore
 
     SESSION.commit()  # type: ignore
 
