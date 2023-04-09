@@ -139,6 +139,8 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
+    return text("", 500)
+
     comment: typing.Dict[str, str] = request.values
     sql_obj: Comment
 
