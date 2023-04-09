@@ -2,9 +2,13 @@
 # -*- coding: utf-8 -*-
 """comments section api"""
 
+import os
 import string
+import sys
+import traceback
 import typing
-from datetime import datetime
+from functools import lru_cache
+from hashlib import sha256
 from secrets import SystemRandom
 from urllib.parse import urlencode
 from warnings import filterwarnings as filter_warnings
@@ -16,7 +20,7 @@ from flask_limit import RateLimiter  # type: ignore
 from sqlalchemy.orm import Session, declarative_base  # type: ignore
 from werkzeug.wrappers.response import Response as WResponse
 
-ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(
+ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(  # type: ignore
     "sqlite:///ari-web-comments.db?check_same_thread=False"
 )
 BASE: typing.Any = declarative_base()
@@ -25,19 +29,16 @@ SESSION: Session = sqlalchemy.orm.Session(ENGINE)  # type: ignore
 MAX_CONTENT_LEN: int = 1024
 MAX_AUTHOR_LEN: int = 100
 
+RAND: SystemRandom = SystemRandom()
+
 
 def text(text: str, code: int = 200) -> Response:
     return Response(text, code, mimetype="text/plain")
 
 
-def censor_text(text: str) -> str:
-    return (
-        hex(
-            (sum(map(lambda c: (ord(c) << 1) + MAX_AUTHOR_LEN, text)) << 5)
-            + MAX_CONTENT_LEN
-        )
-        + "f"
-    )
+@lru_cache(maxsize=512)
+def hash_ip(ip: str) -> str:
+    return sha256(ip.encode()).hexdigest()
 
 
 class Comment(BASE):  # type: ignore
@@ -52,10 +53,25 @@ class Comment(BASE):  # type: ignore
     author: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_AUTHOR_LEN)
     )
+    ip: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String(68))
 
     def __init__(self, content: str, author: str) -> None:
         self.content = content  # type: ignore
         self.author = author  # type: ignore
+        self.ip = hash_ip(request.remote_addr)  # type: ignore
+
+
+class Ban(BASE):  # type: ignore
+    __tablename__: str = "bans"
+
+    ip: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String(68),
+        primary_key=True,
+        unique=True,
+    )
+
+    def __init__(self, ip: str) -> None:
+        self.ip = ip  # type: ignore
 
 
 BASE.metadata.create_all(ENGINE)
@@ -65,19 +81,40 @@ app: Flask = Flask(__name__)
 
 app.config.update(  # type: ignore
     {
-        "RATELIMITE_LIMIT": 10,
-        "RATELIMITE_PERIOD": 50,
-        "SECRET_KEY": "".join(SystemRandom().choices(string.printable, k=8192)),
+        "RATELIMITE_LIMIT": 6,
+        "RATELIMITE_PERIOD": 10,
+        "SECRET_KEY": "".join(RAND.choices(string.printable, k=8192)),
     }
 )
 
-limiter: RateLimiter = RateLimiter(app)
+pw: str
+
+if os.path.exists("pw"):
+    with open("pw", "r") as f:
+        pw = f.read()
+else:
+    with open("pw", "w") as f:
+        f.write(
+            (
+                pw := "".join(
+                    RAND.choices(
+                        string.ascii_letters + string.digits + string.punctuation, k=128
+                    )
+                )
+            )
+        )
 
 
 @app.before_request
-@limiter.rate_limit  # type: ignore
-def limit_requests() -> None:
-    pass
+@RateLimiter(app).rate_limit  # type: ignore
+def limit_requests() -> typing.Union[None, Response]:
+    return (
+        None
+        if SESSION.query(Ban).where(Ban.ip == hash_ip(request.remote_addr)).first() is None  # type: ignore
+        else text("you have been banned", 403)
+        if request.headers.get("api-key") != pw
+        else None
+    )
 
 
 @app.after_request  # type: ignore
@@ -112,13 +149,18 @@ def add_comment() -> Response:
         return text("no valid comment provided", 400)
 
     SESSION.add((sql_obj := Comment(content, author)))  # type: ignore
-    SESSION.commit()
+    SESSION.commit()  # type: ignore
 
     return text(str(sql_obj.cid))
 
 
 @app.get("/<int:cid_from>/<int:cid_to>")
 def get_comments(cid_from: int, cid_to: int) -> Response:
+    if (cid_to - cid_from) > 36:
+        j: Response = jsonify({})
+        j.status_code = 413
+        return j
+
     return jsonify(
         {
             c.cid: [c.author, c.content]
@@ -131,33 +173,52 @@ def get_comments(cid_from: int, cid_to: int) -> Response:
 
 @app.get("/total")
 def total() -> Response:
-    return text(str(SESSION.query(Comment.cid).count()))
+    return text(str(SESSION.query(Comment.cid).count()))  # type: ignore
 
 
-@app.post("/censor")
-def censor_comment() -> typing.Tuple[str, int]:
-    censor: typing.Dict[str, str] = request.values
+@app.post("/sql")
+def run_sql() -> Response:
+    if request.headers.get("api-key") != pw:
+        return text("wrong api key", 401)
+    elif "sql" not in request.values:
+        return text("no sql query", 400)
 
-    if request.remote_addr != "127.0.0.1":
-        return "", 403
-    elif not all(k in censor for k in ("id", "reason")):
-        return "", 400
-    elif not (reason := censor["reason"].strip()):
-        return "", 422
+    out: typing.Tuple[str, int]
 
-    user: typing.Optional[Comment] = (  # type: ignore
-        SESSION.query(Comment).where(Comment.cid == censor["id"]).first()  # type: ignore
+    try:
+        out = str(SESSION.execute(request.values["sql"]).fetchall()), 200  # type: ignore
+        SESSION.commit()  # type: ignore
+    except sqlalchemy.exc.ResourceClosedError:  # type: ignore
+        out = "", 204
+        SESSION.commit()  # type: ignore
+    except Exception:
+        SESSION.rollback()  # type: ignore
+        out = traceback.format_exc(), 500
+        print(out[0], file=sys.stderr)
+
+    return text(*out)
+
+
+@app.post("/ban")
+def ban() -> Response:
+    if request.headers.get("api-key") != pw:
+        return text("wrong api key", 401)
+    elif "id" not in request.values:
+        return text("no comment id", 400)
+
+    comment: Comment = (  # type: ignore
+        SESSION.query(Comment).where(Comment.cid == request.values["id"]).first()  # type: ignore
     )
 
-    if user is None:
-        return "", 404
+    if comment is None:
+        return text("no such comment", 404)
+    elif not comment.ip:  # type: ignore
+        return text("cannot ban the commenter", 403)
 
-    user.author = censor_text(user.author)  # type: ignore
-    user.content = f"[ {censor_text(user.content)} censored on [ {datetime.utcnow()} UTC ] due to [ {reason} ] ]"  # type: ignore
-
+    SESSION.add(Ban(comment.ip))  # type: ignore
     SESSION.commit()  # type: ignore
 
-    return "", 200
+    return text(str(comment.ip))  # type: ignore
 
 
 @app.get("/favicon.ico")
