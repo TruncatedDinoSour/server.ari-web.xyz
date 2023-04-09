@@ -81,8 +81,8 @@ app: Flask = Flask(__name__)
 
 app.config.update(  # type: ignore
     {
-        "RATELIMITE_LIMIT": 6,
-        "RATELIMITE_PERIOD": 10,
+        "RATELIMITE_LIMIT": 4,
+        "RATELIMITE_PERIOD": 12,
         "SECRET_KEY": "".join(RAND.choices(string.printable, k=8192)),
     }
 )
@@ -139,7 +139,7 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
-    return text("", 500)
+    return text("", 403)
 
     comment: typing.Dict[str, str] = request.values
     sql_obj: Comment
@@ -158,7 +158,7 @@ def add_comment() -> Response:
 
 @app.get("/<int:cid_from>/<int:cid_to>")
 def get_comments(cid_from: int, cid_to: int) -> Response:
-    if (cid_to - cid_from) > 36:
+    if abs(cid_to - cid_from) > 21:
         j: Response = jsonify({})
         j.status_code = 413
         return j
