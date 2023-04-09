@@ -186,7 +186,7 @@ def run_sql() -> Response:
     out: typing.Tuple[str, int]
 
     try:
-        out = str(SESSION.execute(request.values["sql"]).fetchall()), 200  # type: ignore
+        out = str(SESSION.execute(request.values["sql"]).all()), 200  # type: ignore
         SESSION.commit()  # type: ignore
     except sqlalchemy.exc.ResourceClosedError:  # type: ignore
         out = "", 204
