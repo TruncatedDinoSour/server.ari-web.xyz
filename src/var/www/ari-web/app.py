@@ -27,7 +27,7 @@ BASE: typing.Any = declarative_base()
 SESSION: Session = sqlalchemy.orm.Session(ENGINE)  # type: ignore
 
 MAX_CONTENT_LEN: int = 1024
-MAX_AUTHOR_LEN: int = 100
+MAX_AUTHOR_LEN: int = 64
 MAX_APPS_ACOUNT: int = 25
 MAX_FETCH_COUNT: int = 25
 
@@ -163,7 +163,7 @@ def limit_requests() -> typing.Union[None, Response]:
         None
         if request.headers.get("api-key") == pw
         or SESSION.query(Ban).where(Ban.ip == hash_ip(request.remote_addr)).first() is None  # type: ignore
-        else text("youre banned", 403)
+        else text("banned", 403)
     )
 
 
@@ -210,7 +210,7 @@ def add_comment() -> Response:
     SESSION.add((sql_obj := Comment(content, whitelist.author, request.headers.get("api-key") == pw)))  # type: ignore
     SESSION.commit()  # type: ignore
 
-    return text(str(sql_obj.cid))
+    return jsonify((sql_obj.cid, sql_obj.admin))
 
 
 @app.get("/<int:cid_from>/<int:cid_to>")
@@ -288,7 +288,7 @@ def apply() -> Response:
         SESSION.rollback()  # type: ignore
         return text("already applied / invalid application", 400)
 
-    return text("")
+    return text("OK")
 
 
 @app.get("/whoami")
