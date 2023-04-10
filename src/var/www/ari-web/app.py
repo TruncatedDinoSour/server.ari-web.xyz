@@ -31,11 +31,9 @@ MAX_AUTHOR_LEN: int = 100
 MAX_APPS_ACOUNT: int = 25
 MAX_FETCH_COUNT: int = 25
 
-RAND: SystemRandom = SystemRandom()
+COMMENT_LOCK: str = ".comment-lock"
 
-comment_lock: typing.Dict[str, bool] = {
-    "locked": False,
-}
+RAND: SystemRandom = SystemRandom()
 
 
 def text(text: str, code: int = 200) -> Response:
@@ -192,6 +190,9 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
+    if os.path.exists(COMMENT_LOCK):
+        return text("locked", 403)
+
     comment: typing.Dict[str, str] = request.values
     sql_obj: Comment
 
@@ -300,7 +301,7 @@ def whoami() -> Response:
 
 @app.get("/lock")
 def get_lock() -> Response:
-    return text(str(int(comment_lock.get("locked"))))  # type: ignore
+    return text(str(int(os.path.exists(COMMENT_LOCK))))  # type: ignore
 
 
 @app.post("/lock")
@@ -308,10 +309,14 @@ def lock() -> Response:
     if request.headers.get("api-key") != pw:
         return text("wrong api key", 401)
 
-    lock: bool = not comment_lock.get("locked")
-    comment_lock["locked"] = lock
+    clock: bool = os.path.exists(COMMENT_LOCK)
 
-    return text(str(int(lock)))
+    if clock:
+        os.remove(COMMENT_LOCK)
+    else:
+        open(COMMENT_LOCK).close()
+
+    return text(str(int(not clock)))
 
 
 @app.get("/favicon.ico")
