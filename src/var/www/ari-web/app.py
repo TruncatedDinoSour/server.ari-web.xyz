@@ -314,7 +314,7 @@ def lock() -> Response:
     if clock:
         os.remove(COMMENT_LOCK)
     else:
-        open(COMMENT_LOCK).close()
+        open(COMMENT_LOCK, "w").close()
 
     return text(str(int(not clock)))
 
