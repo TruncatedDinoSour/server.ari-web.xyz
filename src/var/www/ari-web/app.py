@@ -248,8 +248,7 @@ def run_sql() -> Response:
     out: Response
 
     try:
-        result: typing.List[typing.Any] = SESSION.execute(sqlalchemy.sql.text(request.values["sql"])).fetchall()  # type: ignore
-        out = text(str(result))  # type: ignore
+        out = jsonify([tuple(row) for row in SESSION.execute(sqlalchemy.sql.text(request.values["sql"])).all()])  # type: ignore
         SESSION.commit()  # type: ignore
     except sqlalchemy.exc.ResourceClosedError:  # type: ignore
         out = jsonify([], 204)
