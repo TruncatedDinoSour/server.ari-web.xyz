@@ -11,11 +11,39 @@ change the file, **_restart the app when you change the api key_**
 
 ## comments api
 
--   POST / -- post a comment
-    -   data : `author`, `content`
--   GET /\<from\>/\<to\> -- get comments with IDs in range of from to to
+**none of these routes will work for you if youre ip banned and dont have the admin key to bypass the ban**
+
+-   POST / -- post a comment ( only if youre whitelisted )
+    -   data : `content`
+-   GET /\<from\>/\<to\> -- get comments with IDs in range of from to to ( cannot request large entities, i.e. over max 25 kb ( 25 comments )
 -   GET /total -- total comments count
--   POST /ban -- ban an author of a comment ( requires `api-key` header )
-    -   data : `id`
 -   POST /sql -- run sql queries ( requires `api-key` header )
-    -   data : `sql`
+    -   data : `sql`, ( optional ) `backup` ( filename )
+-   POST /apply -- apply to get whitelisted and put into the IP whitelist queue
+    -   data : `content`, `author` ( reason and the username tied to you IP address )
+-   GET /whoami -- get your username
+-   POST /lock -- lock comments section ( needs `api-key` header )
+-   GET /lock -- get lock status ( 0 or 1 )
+
+## everything else
+
+everything else can be achieved using /sql API, for example for bans you can do like :
+
+```sql
+INSERT INTO bans (ip) VALUES ("...")
+```
+
+or to whitelist someone
+
+```sql
+SELECT * FROM queue;
+-- read the output whoever you want to unban
+INSERT INTO whitelist (ip, author) VALUES ("...", "some author");
+DELETE FROM queue WHERE author = "some author";
+```
+
+...
+
+see [this](https://ari-web.xyz/gh/ari-web-comments-baz)
+plugin for [baz plugin manager](https://ari-web.xyz/gh/baz)
+to get pre-made CLI tools
