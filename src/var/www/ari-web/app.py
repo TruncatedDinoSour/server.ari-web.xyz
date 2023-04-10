@@ -16,6 +16,7 @@ from warnings import filterwarnings as filter_warnings
 import sqlalchemy  # type: ignore
 from flask import redirect  # type: ignore
 from flask import Flask, Response, g, jsonify, request
+from flask_caching import Cache
 from flask_limit import RateLimiter  # type: ignore
 from sqlalchemy.orm import Session, declarative_base  # type: ignore
 from werkzeug.wrappers.response import Response as WResponse
@@ -129,6 +130,12 @@ BASE.metadata.create_all(ENGINE)
 
 
 app: Flask = Flask(__name__)
+cache: Cache = Cache(app, config={"CACHE_TYPE": "simple"})  # type: ignore
+
+cache.set(  # type: ignore
+    "comment_lock",
+    False,
+)
 
 app.config.update(  # type: ignore
     {
@@ -190,7 +197,7 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
-    if comment_lock:
+    if cache.get("comment_lock"):  # type: ignore
         return text("locked", 403)
 
     comment: typing.Dict[str, str] = request.values
@@ -301,17 +308,17 @@ def whoami() -> Response:
 
 @app.get("/lock")
 def get_lock() -> Response:
-    return text(str(int(comment_lock)))
+    return text(str(int(cache.get("comment_lock"))))  # type: ignore
 
 
 @app.post("/lock")
 def lock() -> Response:
-    global comment_lock
-
     if request.headers.get("api-key") != pw:
         return text("wrong api key", 401)
 
-    comment_lock = not comment_lock
+    comment_lock: bool = not cache.get("comment_lock")  # type: ignore
+    cache.set("comment_lock", comment_lock)  # type: ignore
+
     return text(str(int(comment_lock)))
 
 
