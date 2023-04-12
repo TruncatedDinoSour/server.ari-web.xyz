@@ -36,6 +36,16 @@ COMMENT_LOCK: str = ".comments.lock"
 
 RAND: SystemRandom = SystemRandom()
 
+app: Flask = Flask(__name__)
+
+app.config.update(  # type: ignore
+    {
+        "RATELIMITE_LIMIT": 8,
+        "RATELIMIT_PERIOD": 12,
+        "SECRET_KEY": RAND.randbytes(8196),
+    }
+)
+
 
 pw: str
 
@@ -168,17 +178,6 @@ class IpQueue(BASE):  # type: ignore
 BASE.metadata.create_all(ENGINE)
 
 
-app: Flask = Flask(__name__)
-
-app.config.update(  # type: ignore
-    {
-        "RATELIMITE_LIMIT": 12,
-        "RATELIMIT_PERIOD": 12,
-        "SECRET_KEY": RAND.randbytes(8196),
-    }
-)
-
-
 @app.before_request
 @RateLimiter(app).rate_limit  # type: ignore
 def limit_requests() -> typing.Union[None, Response]:
@@ -223,7 +222,8 @@ def add_comment() -> Response:
 
     if not content:
         return text("no valid content provided", 400)
-    elif (
+
+    if (
         whitelist := SESSION.query(IpWhitelist)  # type: ignore
         .where(IpWhitelist.ip == hash_ip(request.remote_addr))
         .first()
@@ -300,7 +300,8 @@ def apply() -> Response:
 
     if not all((author, content)):
         return text("missing params", 400)
-    elif SESSION.query(IpQueue.ip).count() >= MAX_APPS_ACOUNT:  # type: ignore
+
+    if SESSION.query(IpQueue.ip).count() >= MAX_APPS_ACOUNT:  # type: ignore
         return text("too many applicants at this moment, try again later", 413)
 
     ip: str = hash_ip(request.remote_addr)
