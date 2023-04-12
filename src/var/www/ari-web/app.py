@@ -31,6 +31,7 @@ MAX_CONTENT_LEN: int = 1024
 MAX_AUTHOR_LEN: int = 64
 MAX_APPS_ACOUNT: int = 25
 MAX_FETCH_COUNT: int = 25
+MAX_IP_LEN: int = 64
 
 COMMENT_LOCK: str = ".comments.lock"
 
@@ -118,9 +119,10 @@ class Ban(BASE):  # type: ignore
     __tablename__: str = "bans"
 
     ip: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String(68),
+        sqlalchemy.String(MAX_IP_LEN),
         primary_key=True,
         unique=True,
+        nullable=False,
     )
 
     def __init__(self, ip: str) -> None:
@@ -131,7 +133,7 @@ class IpWhitelist(BASE):  # type: ignore
     __tablename__: str = "whitelist"
 
     ip: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String(68),
+        sqlalchemy.String(MAX_IP_LEN),
         primary_key=True,
         unique=True,
         nullable=False,
@@ -152,7 +154,7 @@ class IpQueue(BASE):  # type: ignore
     __tablename__: str = "queue"
 
     ip: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String(68),
+        sqlalchemy.String(MAX_IP_LEN),
         primary_key=True,
         unique=True,
         nullable=False,
