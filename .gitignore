@@ -160,8 +160,9 @@ cython_debug/
 
 # Databases
 *.db
+*.sql
 
 # Other
 .ccls-cache/
 pw
-lock
+.comments.lock

@@ -13,17 +13,18 @@ change the file, **_restart the app when you change the api key_**
 
 **none of these routes will work for you if youre ip banned and dont have the admin key to bypass the ban**
 
--   POST / -- post a comment ( only if youre whitelisted )
+-   POST / -- post a comment ( only if youre whitelisted or are an administrator )
     -   data : `content`
 -   GET /\<from\>/\<to\> -- get comments with IDs in range of from to to ( cannot request large entities, i.e. over max 25 kb ( 25 comments )
 -   GET /total -- total comments count
 -   POST /sql -- run sql queries ( requires `api-key` header )
-    -   data : `sql`, ( optional ) `backup` ( filename )
+    -   data : `sql` ( multiple queries, like `data={"sql": [...]}` ), `backup` ( filename )
 -   POST /apply -- apply to get whitelisted and put into the IP whitelist queue
     -   data : `content`, `author` ( reason and the username tied to you IP address )
 -   GET /whoami -- get your username
 -   POST /lock -- lock comments section ( needs `api-key` header )
 -   GET /lock -- get lock status ( 0 or 1 )
+-   GET /amiadmin -- get admin status ( 0 or 1 )
 
 ## everything else
 

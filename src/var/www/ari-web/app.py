@@ -6,7 +6,7 @@ import os
 import string
 import traceback
 import typing
-from functools import lru_cache
+from functools import lru_cache, wraps
 from hashlib import sha256
 from secrets import SystemRandom
 from shutil import copyfile
@@ -20,8 +20,9 @@ from flask_limit import RateLimiter  # type: ignore
 from sqlalchemy.orm import Session, declarative_base  # type: ignore
 from werkzeug.wrappers.response import Response as WResponse
 
+DB_NAME: str = "ari-web-comments.db"
 ENGINE: sqlalchemy.engine.base.Engine = sqlalchemy.create_engine(  # type: ignore
-    "sqlite:///ari-web-comments.db?check_same_thread=False"
+    f"sqlite:///{DB_NAME}?check_same_thread=False"
 )
 BASE: typing.Any = declarative_base()
 SESSION: Session = sqlalchemy.orm.Session(ENGINE)  # type: ignore
@@ -31,13 +32,45 @@ MAX_AUTHOR_LEN: int = 64
 MAX_APPS_ACOUNT: int = 25
 MAX_FETCH_COUNT: int = 25
 
-COMMENT_LOCK: str = ".comment-lock"
+COMMENT_LOCK: str = ".comments.lock"
 
 RAND: SystemRandom = SystemRandom()
 
 
+pw: str
+
+if os.path.exists("pw"):
+    with open("pw", "r") as f:
+        pw = f.read()
+else:
+    with open("pw", "w") as f:
+        f.write(
+            (
+                pw := "".join(
+                    RAND.choices(
+                        string.ascii_letters + string.digits + string.punctuation, k=256
+                    )
+                )
+            )
+        )
+
+
 def text(text: str, code: int = 200) -> Response:
     return Response(text, code, mimetype="text/plain")
+
+
+def is_api_key_ok() -> bool:
+    return request.headers.get("api-key") == pw
+
+
+def require_key(
+    f: typing.Callable[..., typing.Any]
+) -> typing.Callable[..., typing.Any]:
+    @wraps(f)
+    def wrap(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        return f(*args, **kwargs) if is_api_key_ok() else text("wrong api-key", 401)
+
+    return wrap
 
 
 @lru_cache(maxsize=512)
@@ -49,24 +82,26 @@ class Comment(BASE):  # type: ignore
     __tablename__: str = "comments"
 
     cid: sqlalchemy.Column[int] = sqlalchemy.Column(
-        sqlalchemy.Integer, primary_key=True
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False,
     )
     content: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String(MAX_CONTENT_LEN)
+        sqlalchemy.String(MAX_CONTENT_LEN),
+        nullable=False,
     )
     author: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String(MAX_AUTHOR_LEN)
+        sqlalchemy.String(MAX_AUTHOR_LEN),
+        nullable=False,
     )
-    ip: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String(68))
     admin: sqlalchemy.Column[bool] = sqlalchemy.Column(
         sqlalchemy.Boolean,
     )
 
-    def __init__(self, content: str, author: str, admin: bool) -> None:
+    def __init__(self, content: str, author: str) -> None:
         self.content = content  # type: ignore
         self.author = author  # type: ignore
-        self.ip = hash_ip(request.remote_addr)  # type: ignore
-        self.admin = admin  # type: ignore
+        self.admin = is_api_key_ok()  # type: ignore
 
 
 class Ban(BASE):  # type: ignore
@@ -89,11 +124,13 @@ class IpWhitelist(BASE):  # type: ignore
         sqlalchemy.String(68),
         primary_key=True,
         unique=True,
+        nullable=False,
     )
 
     author: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_AUTHOR_LEN),
         unique=True,
+        nullable=False,
     )
 
     def __init__(self, ip: str, author: str) -> None:
@@ -108,15 +145,18 @@ class IpQueue(BASE):  # type: ignore
         sqlalchemy.String(68),
         primary_key=True,
         unique=True,
+        nullable=False,
     )
 
     author: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_AUTHOR_LEN),
         unique=True,
+        nullable=False,
     )
 
     content: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_CONTENT_LEN),
+        nullable=False,
     )
 
     def __init__(self, ip: str, author: str, content: str) -> None:
@@ -133,27 +173,10 @@ app: Flask = Flask(__name__)
 app.config.update(  # type: ignore
     {
         "RATELIMITE_LIMIT": 12,
-        "RATELIMITE_PERIOD": 12,
-        "SECRET_KEY": RAND.randbytes(8320),
+        "RATELIMIT_PERIOD": 12,
+        "SECRET_KEY": RAND.randbytes(8196),
     }
 )
-
-pw: str
-
-if os.path.exists("pw"):
-    with open("pw", "r") as f:
-        pw = f.read()
-else:
-    with open("pw", "w") as f:
-        f.write(
-            (
-                pw := "".join(
-                    RAND.choices(
-                        string.ascii_letters + string.digits + string.punctuation, k=256
-                    )
-                )
-            )
-        )
 
 
 @app.before_request
@@ -161,7 +184,7 @@ else:
 def limit_requests() -> typing.Union[None, Response]:
     return (
         None
-        if request.headers.get("api-key") == pw
+        if is_api_key_ok()
         or SESSION.query(Ban).where(Ban.ip == hash_ip(request.remote_addr)).first() is None  # type: ignore
         else text("banned", 403)
     )
@@ -190,7 +213,7 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
-    if os.path.exists(COMMENT_LOCK):
+    if os.path.exists(COMMENT_LOCK) and not is_api_key_ok():
         return text("locked", 403)
 
     comment: typing.Dict[str, str] = request.values
@@ -207,7 +230,7 @@ def add_comment() -> Response:
     ) is None:
         return text("you are not whitelisted", 401)
 
-    SESSION.add((sql_obj := Comment(content, whitelist.author, request.headers.get("api-key") == pw)))  # type: ignore
+    SESSION.add((sql_obj := Comment(content, whitelist.author)))  # type: ignore
     SESSION.commit()  # type: ignore
 
     return jsonify((sql_obj.cid, sql_obj.admin))
@@ -236,28 +259,38 @@ def total() -> Response:
 
 
 @app.post("/sql")
+@require_key
 def run_sql() -> Response:
-    if request.headers.get("api-key") != pw:
-        return text("wrong api key", 401)
-    elif "sql" not in request.values:
-        return text("no sql query", 400)
+    if "sql" not in request.values:
+        return text("no sql queries", 400)
 
     if "backup" in request.values:
-        copyfile("ari-web-comments.db", request.values["backup"] + ".db")
+        copyfile(DB_NAME, f"{request.values['backup']}.db")
 
-    out: Response
+    json: typing.Any = []
 
-    try:
-        out = jsonify([tuple(row) for row in SESSION.execute(sqlalchemy.sql.text(request.values["sql"])).all()])  # type: ignore
-        SESSION.commit()  # type: ignore
-    except sqlalchemy.exc.ResourceClosedError:  # type: ignore
-        out = jsonify([], 204)
-        SESSION.commit()  # type: ignore
-    except Exception:
-        SESSION.rollback()  # type: ignore
-        out = text(traceback.format_exc(), 500)
+    for query in request.values.getlist("sql"):
+        try:
+            json.append(
+                [
+                    tuple(row)
+                    for row in SESSION.execute(  # type: ignore
+                        sqlalchemy.sql.text(query),
+                    ).fetchall()
+                ]  # type: ignore
+            )
 
-    return out
+            SESSION.commit()  # type: ignore
+        except sqlalchemy.exc.ResourceClosedError:  # type: ignore
+            SESSION.commit()  # type: ignore
+            json.append([])
+        except Exception:
+            SESSION.rollback()  # type: ignore
+            j: Response = jsonify([json, traceback.format_exc()])
+            j.status_code = 500
+            return j
+
+    return jsonify(json)
 
 
 @app.post("/apply")
@@ -268,7 +301,7 @@ def apply() -> Response:
     if not all((author, content)):
         return text("missing params", 400)
     elif SESSION.query(IpQueue.ip).count() >= MAX_APPS_ACOUNT:  # type: ignore
-        return text("too many applicants at this moment try again later", 429)
+        return text("too many applicants at this moment, try again later", 413)
 
     ip: str = hash_ip(request.remote_addr)
 
@@ -288,7 +321,7 @@ def apply() -> Response:
         SESSION.rollback()  # type: ignore
         return text("already applied / invalid application", 400)
 
-    return text("OK")
+    return text("ok")
 
 
 @app.get("/whoami")
@@ -305,10 +338,8 @@ def get_lock() -> Response:
 
 
 @app.post("/lock")
+@require_key
 def lock() -> Response:
-    if request.headers.get("api-key") != pw:
-        return text("wrong api key", 401)
-
     clock: bool = os.path.exists(COMMENT_LOCK)
 
     if clock:
@@ -317,6 +348,11 @@ def lock() -> Response:
         open(COMMENT_LOCK, "w").close()
 
     return text(str(int(not clock)))
+
+
+@app.get("/amiadmin")
+def amiadmin() -> Response:
+    return text(str(int(is_api_key_ok())))
 
 
 @app.get("/favicon.ico")
