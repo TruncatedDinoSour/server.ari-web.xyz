@@ -232,10 +232,14 @@ def add_comment() -> Response:
     ) is None:
         return text("you are not whitelisted", 401)
 
-    SESSION.add((sql_obj := Comment(content, whitelist.author)))  # type: ignore
-    SESSION.commit()  # type: ignore
+    try:
+        SESSION.add((sql_obj := Comment(content, whitelist.author)))  # type: ignore
+        SESSION.commit()  # type: ignore
+    except sqlalchemy.exc.IntegrityError:  # type: ignore
+        SESSION.rollback()  # type: ignore
+        return text("invalid comment", 400)
 
-    return jsonify((sql_obj.cid, sql_obj.admin))
+    return jsonify([sql_obj.cid, sql_obj.admin])
 
 
 @app.get("/<int:cid_from>/<int:cid_to>")
