@@ -93,6 +93,10 @@ def ip_hash() -> str:
     return hash_ip(request.remote_addr)
 
 
+def mk_valid_author(author: str) -> str:
+    return "".join(c for c in author.strip() if c in string.printable.strip() + " ")
+
+
 class Comment(BASE):  # type: ignore
     __tablename__: str = "comments"
 
@@ -311,7 +315,7 @@ def run_sql() -> Response:
 @app.post("/apply")
 def apply() -> Response:
     content: str = request.values.get("content", "").strip()[:MAX_CONTENT_LEN]
-    author: str = request.values.get("author", "").strip()[:MAX_AUTHOR_LEN]
+    author: str = mk_valid_author(request.values.get("author", ""))[:MAX_AUTHOR_LEN]
 
     if not all((author, content)):
         return text("missing params", 400)
