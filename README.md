@@ -25,6 +25,7 @@ change the file, **_restart the app when you change the api key_**
 -   POST /lock -- lock comments section ( needs `api-key` header )
 -   GET /lock -- get lock status ( 0 or 1 )
 -   GET /amiadmin -- get admin status ( 0 or 1 )
+-   GET /applied -- get 'if applied' status
 
 ## everything else
 

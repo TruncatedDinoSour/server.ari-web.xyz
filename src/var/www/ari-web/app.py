@@ -89,6 +89,10 @@ def hash_ip(ip: str) -> str:
     return sha256(ip.encode()).hexdigest()
 
 
+def ip_hash() -> str:
+    return hash_ip(request.remote_addr)
+
+
 class Comment(BASE):  # type: ignore
     __tablename__: str = "comments"
 
@@ -171,8 +175,8 @@ class IpQueue(BASE):  # type: ignore
         nullable=False,
     )
 
-    def __init__(self, ip: str, author: str, content: str) -> None:
-        self.ip = ip  # type: ignore
+    def __init__(self, author: str, content: str) -> None:
+        self.ip = ip_hash()  # type: ignore
         self.author = author  # type: ignore
         self.content = content  # type: ignore
 
@@ -186,7 +190,7 @@ def limit_requests() -> typing.Union[None, Response]:
     return (
         None
         if is_api_key_ok()
-        or SESSION.query(Ban).where(Ban.ip == hash_ip(request.remote_addr)).first() is None  # type: ignore
+        or SESSION.query(Ban).where(Ban.ip == ip_hash()).first() is None  # type: ignore
         else text("banned", 403)
     )
 
@@ -214,7 +218,9 @@ def after_request(response: Response) -> Response:
 
 @app.post("/")
 def add_comment() -> Response:
-    if os.path.exists(COMMENT_LOCK) and not is_api_key_ok():
+    not_admin: bool = True
+
+    if os.path.exists(COMMENT_LOCK) and (not_admin := not is_api_key_ok()):
         return text("locked", 403)
 
     comment: typing.Dict[str, str] = request.values
@@ -225,11 +231,14 @@ def add_comment() -> Response:
     if not content:
         return text("no valid content provided", 400)
 
-    if (
-        whitelist := SESSION.query(IpWhitelist)  # type: ignore
-        .where(IpWhitelist.ip == hash_ip(request.remote_addr))
-        .first()
-    ) is None:
+    if not_admin and (
+        (
+            whitelist := SESSION.query(IpWhitelist)  # type: ignore
+            .where(IpWhitelist.ip == ip_hash())
+            .first()
+        )
+        is None
+    ):
         return text("you are not whitelisted", 401)
 
     try:
@@ -310,15 +319,25 @@ def apply() -> Response:
     if SESSION.query(IpQueue.ip).count() >= MAX_APPS_ACOUNT:  # type: ignore
         return text("too many applicants at this moment, try again later", 413)
 
-    ip: str = hash_ip(request.remote_addr)
+    if (  # type: ignore
+        SESSION.query(IpQueue)  # type: ignore
+        .filter(sqlalchemy.or_(IpQueue.ip == ip_hash(), IpQueue.author == author))
+        .first()
+    ) is not None:
+        return text("already applied / username is taken", 403)
 
-    if SESSION.query(IpWhitelist).where(IpWhitelist.ip == ip or IpWhitelist.author == author).first() is not None:  # type: ignore
-        return text("already whitelisted / username is taken", 208)
+    if (  # type: ignore
+        SESSION.query(IpWhitelist)  # type: ignore
+        .filter(
+            sqlalchemy.or_(IpWhitelist.author == author, IpWhitelist.ip == ip_hash())
+        )
+        .first()
+    ) is not None:
+        return text("already whitelisted / username is taken", 403)
 
     try:
         SESSION.add(  # type: ignore
             IpQueue(
-                ip,
                 author,
                 content,
             )
@@ -326,14 +345,14 @@ def apply() -> Response:
         SESSION.commit()  # type: ignore
     except sqlalchemy.exc.IntegrityError:  # type: ignore
         SESSION.rollback()  # type: ignore
-        return text("already applied / invalid application", 400)
+        return text("invalid application", 400)
 
     return text("ok")
 
 
 @app.get("/whoami")
 def whoami() -> Response:
-    if (who := SESSION.query(IpWhitelist).where(IpWhitelist.ip == hash_ip(request.remote_addr)).first()) is None:  # type: ignore
+    if (who := SESSION.query(IpWhitelist).where(IpWhitelist.ip == ip_hash()).first()) is None:  # type: ignore
         return text("", 403)
 
     return text(who.author)  # type: ignore
@@ -360,6 +379,13 @@ def lock() -> Response:
 @app.get("/amiadmin")
 def amiadmin() -> Response:
     return text(str(int(is_api_key_ok())))
+
+
+@app.get("/applied")
+def applied() -> Response:
+    return text(
+        str(int(SESSION.query(IpQueue).filter(IpQueue.ip == ip_hash()) is not None))  # type: ignore
+    )
 
 
 @app.get("/favicon.ico")
