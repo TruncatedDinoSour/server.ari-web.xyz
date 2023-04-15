@@ -384,7 +384,7 @@ def amiadmin() -> Response:
 @app.get("/applied")
 def applied() -> Response:
     return text(
-        str(int(SESSION.query(IpQueue).filter(IpQueue.ip == ip_hash()) is not None))  # type: ignore
+        str(int(SESSION.query(IpQueue).filter(IpQueue.ip == ip_hash()).first() is not None))  # type: ignore
     )
 
 
