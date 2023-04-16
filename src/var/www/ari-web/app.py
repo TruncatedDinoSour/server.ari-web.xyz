@@ -235,14 +235,14 @@ def add_comment() -> Response:
     if not content:
         return text("no valid content provided", 400)
 
-    if not_admin and (
+    if (
         (
             whitelist := SESSION.query(IpWhitelist)  # type: ignore
             .where(IpWhitelist.ip == ip_hash())
             .first()
         )
         is None
-    ):
+    ) and not_admin:
         return text("you are not whitelisted", 401)
 
     try:
