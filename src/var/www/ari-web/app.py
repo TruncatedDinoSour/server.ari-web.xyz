@@ -185,6 +185,25 @@ class IpQueue(BASE):  # type: ignore
         self.content = content  # type: ignore
 
 
+class AnonMsg(BASE):  # type: ignore
+    __tablename__: str = "anon"
+
+    cid: sqlalchemy.Column[int] = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False,
+    )
+
+    content: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String(MAX_CONTENT_LEN),
+        unique=True,
+        nullable=False,
+    )
+
+    def __init__(self, content: str) -> None:
+        self.content = content  # type: ignore
+
+
 BASE.metadata.create_all(ENGINE)
 
 
@@ -390,6 +409,29 @@ def applied() -> Response:
     return text(
         str(int(SESSION.query(IpQueue).filter(IpQueue.ip == ip_hash()).first() is not None))  # type: ignore
     )
+
+
+@app.post("/anon")
+def anon() -> Response:
+    if os.path.exists(COMMENT_LOCK) and not is_api_key_ok():
+        return text("locked", 403)
+
+    comment: typing.Dict[str, str] = request.values
+    sql_obj: Comment
+
+    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
+
+    if not content:
+        return text("no valid content provided", 400)
+
+    try:
+        SESSION.add((sql_obj := AnonMsg(content)))  # type: ignore
+        SESSION.commit()  # type: ignore
+    except sqlalchemy.exc.IntegrityError:  # type: ignore
+        SESSION.rollback()  # type: ignore
+        return text("invalid anon msg ( might be already in the queue ? )", 400)
+
+    return text(str(sql_obj.cid))
 
 
 @app.get("/favicon.ico")
