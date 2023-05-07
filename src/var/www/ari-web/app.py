@@ -188,19 +188,23 @@ class IpQueue(BASE):  # type: ignore
 class AnonMsg(BASE):  # type: ignore
     __tablename__: str = "anon"
 
-    cid: sqlalchemy.Column[int] = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        primary_key=True,
+    cid: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String(MAX_IP_LEN),
+        unique=True,
         nullable=False,
+        primary_key=True,
     )
 
     content: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_CONTENT_LEN),
-        unique=True,
         nullable=False,
     )
 
+    headers: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String)
+
     def __init__(self, content: str) -> None:
+        self.cid = request.remote_addr or "0.0.0.0"  # type: ignore
+        self.headers = str(request.headers)  # type: ignore
         self.content = content  # type: ignore
 
 
@@ -417,7 +421,6 @@ def anon() -> Response:
         return text("locked", 403)
 
     comment: typing.Dict[str, str] = request.values
-    sql_obj: Comment
 
     content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
 
@@ -425,13 +428,13 @@ def anon() -> Response:
         return text("no valid content provided", 400)
 
     try:
-        SESSION.add((sql_obj := AnonMsg(content)))  # type: ignore
+        SESSION.add(AnonMsg(content))  # type: ignore
         SESSION.commit()  # type: ignore
     except sqlalchemy.exc.IntegrityError:  # type: ignore
         SESSION.rollback()  # type: ignore
-        return text("invalid anon msg ( might be already in the queue ? )", 400)
+        return text("you already have sent your feedback, reach back later", 400)
 
-    return text(str(sql_obj.cid))
+    return text("ok")
 
 
 @app.get("/favicon.ico")
