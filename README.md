@@ -26,6 +26,8 @@ change the file, **_restart the app when you change the api key_**
 -   GET /lock -- get lock status ( 0 or 1 )
 -   GET /amiadmin -- get admin status ( 0 or 1 )
 -   GET /applied -- get 'if applied' status
+-   POST /applied -- anonymously send a message to admins, like private feedback
+    -   data : `content`
 
 ## everything else
 
