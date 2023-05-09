@@ -85,8 +85,8 @@ def require_key(
 
 
 @lru_cache(maxsize=512)
-def hash_ip(ip: str) -> str:
-    return sha256(ip.encode()).hexdigest()
+def hash_ip(ip: typing.Optional[str]) -> str:
+    return sha256((ip or "0.0.0.0").encode()).hexdigest()
 
 
 def ip_hash() -> str:
@@ -188,7 +188,7 @@ class IpQueue(BASE):  # type: ignore
 class AnonMsg(BASE):  # type: ignore
     __tablename__: str = "anon"
 
-    cid: sqlalchemy.Column[str] = sqlalchemy.Column(
+    ip: sqlalchemy.Column[str] = sqlalchemy.Column(
         sqlalchemy.String(MAX_IP_LEN),
         unique=True,
         nullable=False,
@@ -200,11 +200,8 @@ class AnonMsg(BASE):  # type: ignore
         nullable=False,
     )
 
-    headers: sqlalchemy.Column[str] = sqlalchemy.Column(sqlalchemy.String)
-
     def __init__(self, content: str) -> None:
-        self.cid = request.remote_addr or "0.0.0.0"  # type: ignore
-        self.headers = str(request.headers)  # type: ignore
+        self.ip = hash_ip(request.remote_addr)  # type: ignore
         self.content = content  # type: ignore
 
 
@@ -253,7 +250,7 @@ def add_comment() -> Response:
     comment: typing.Dict[str, str] = request.values
     sql_obj: Comment
 
-    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
+    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN].strip()
 
     if not content:
         return text("no valid content provided", 400)
@@ -337,8 +334,8 @@ def run_sql() -> Response:
 
 @app.post("/apply")
 def apply() -> Response:
-    content: str = request.values.get("content", "").strip()[:MAX_CONTENT_LEN]
-    author: str = mk_valid_author(request.values.get("author", ""))[:MAX_AUTHOR_LEN]
+    content: str = request.values.get("content", "").strip()[:MAX_CONTENT_LEN].strip()
+    author: str = mk_valid_author(request.values.get("author", "").strip())[:MAX_AUTHOR_LEN].strip()
 
     if not all((author, content)):
         return text("missing params", 400)
@@ -422,7 +419,7 @@ def anon() -> Response:
 
     comment: typing.Dict[str, str] = request.values
 
-    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN]
+    content: str = comment.get("content", "").strip()[:MAX_CONTENT_LEN].strip()
 
     if not content:
         return text("no valid content provided", 400)
