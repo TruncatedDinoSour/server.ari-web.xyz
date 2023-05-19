@@ -28,6 +28,7 @@ change the file, **_restart the app when you change the api key_**
 -   GET /applied -- get 'if applied' status
 -   POST /anon -- anonymously send a message to admins, like private feedback
     -   data : `content`
+-   GET /visit -- visit count
 
 ## everything else
 
