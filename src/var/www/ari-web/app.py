@@ -453,7 +453,7 @@ def visit() -> Response:
     svg_width: int = len(count) * 14
 
     return Response(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="20"><text x="{svg_width / 2}" y="20" font-size="20px" fill="white" text-anchor="middle">{count}</text></svg>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="20"><text x="{svg_width / 2}" y="20" font-size="20px" fill="white" text-anchor="middle" font-family="sans-serif">{count}</text></svg>',
         mimetype="image/svg+xml",
     )
 
