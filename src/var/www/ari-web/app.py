@@ -34,6 +34,7 @@ MAX_FETCH_COUNT: int = 25
 MAX_IP_LEN: int = 64
 
 COMMENT_LOCK: str = ".comments.lock"
+COUNT = open(".counter.dat", "r+")
 
 RAND: SystemRandom = SystemRandom()
 
@@ -228,8 +229,8 @@ def after_request(response: Response) -> Response:
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET,POST",
             "Access-Control-Allow-Headers": "api-key",
-            "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
             "X-Frame-Options": "deny",
+            "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "upgrade-insecure-requests",
             "X-Permitted-Cross-Domain-Policies": "none",
@@ -335,7 +336,9 @@ def run_sql() -> Response:
 @app.post("/apply")
 def apply() -> Response:
     content: str = request.values.get("content", "").strip()[:MAX_CONTENT_LEN].strip()
-    author: str = mk_valid_author(request.values.get("author", "").strip())[:MAX_AUTHOR_LEN].strip()
+    author: str = mk_valid_author(request.values.get("author", "").strip())[
+        :MAX_AUTHOR_LEN
+    ].strip()
 
     if not all((author, content)):
         return text("missing params", 400)
@@ -432,6 +435,20 @@ def anon() -> Response:
         return text("you already have sent your feedback, reach back later", 400)
 
     return text("ok")
+
+
+@app.get("/visit")
+def visit() -> Response:
+    COUNT.seek(0)
+    count: str = str(int(COUNT.read().strip() or 0) + 1)
+    COUNT.seek(0)
+    COUNT.write(count)
+    COUNT.flush()
+
+    return Response(
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{len(count) * 14}" height="20"><text x="0" y="20" font-size="20px" fill="white">{count}</text></svg>',
+        mimetype="image/svg+xml",
+    )
 
 
 @app.get("/favicon.ico")
