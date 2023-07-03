@@ -240,6 +240,7 @@ def after_request(response: Response) -> Response:
             "Content-Security-Policy": "upgrade-insecure-requests",
             "X-Permitted-Cross-Domain-Policies": "none",
             "Referrer-Policy": "no-referrer",
+            "Cache-Control": "max-age=0, no-cache, no-store, must-revalidate",
         }
     )
 
