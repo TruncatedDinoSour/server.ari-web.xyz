@@ -6,6 +6,7 @@ import os
 import string
 import traceback
 import typing
+from datetime import datetime
 from functools import lru_cache, wraps
 from hashlib import sha256
 from secrets import SystemRandom
@@ -208,6 +209,30 @@ class AnonMsg(BASE):  # type: ignore
 
     def __init__(self, content: str) -> None:
         self.ip = hash_ip(request.remote_addr)  # type: ignore
+        self.content = content  # type: ignore
+
+
+class Store(BASE):  # type: ignore
+    __tablename__: str = "store"
+
+    id: sqlalchemy.Column[int] = sqlalchemy.Column(
+        sqlalchemy.INTEGER,
+        unique=True,
+        primary_key=True,
+    )
+
+    ts: sqlalchemy.Column[int] = sqlalchemy.Column(
+        sqlalchemy.INTEGER,
+    )
+
+    content: sqlalchemy.Column[str] = sqlalchemy.Column(
+        sqlalchemy.String,
+        nullable=False,
+    )
+
+    def __init__(self, content: str) -> None:
+        self.content = content  # type: ignore
+        self.ts = round(datetime.utcnow().timestamp())  # type: ignore
         self.content = content  # type: ignore
 
 
@@ -457,6 +482,19 @@ def visit() -> Response:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="20"><text x="{svg_width / 2}" y="20" font-size="20px" fill="white" text-anchor="middle" font-family="sans-serif">{count}</text></svg>',
         mimetype="image/svg+xml",
     )
+
+
+@app.post("/store")
+def store() -> Response:
+    content: str = request.values.get("data", "")
+
+    if not content:
+        return text("duomenų nerasta jūsų užklausoje", 400)
+
+    SESSION.add(sql := Store(content))  # type: ignore
+    SESSION.commit()  # type: ignore
+
+    return text(f"jūsų duomenys užregistruoti su ID {sql.id}")
 
 
 @app.get("/favicon.ico")
