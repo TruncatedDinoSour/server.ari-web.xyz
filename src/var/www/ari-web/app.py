@@ -14,6 +14,8 @@ from shutil import copyfile
 from urllib.parse import urlencode
 from warnings import filterwarnings as filter_warnings
 
+import geoip2
+import geoip2.database
 import sqlalchemy  # type: ignore
 from flask import redirect  # type: ignore
 from flask import Flask, Response, g, jsonify, request
@@ -45,6 +47,7 @@ COUNT = open(".counter.dat", "r+")
 RAND: SystemRandom = SystemRandom()
 
 app: Flask = Flask(__name__)
+geoip_reader: geoip2.database.Reader = geoip2.database.Reader("GeoLite2-Country.mmdb")
 
 app.config.update(  # type: ignore
     {
@@ -486,6 +489,15 @@ def visit() -> Response:
 
 @app.post("/store")
 def store() -> Response:
+    try:
+        if (
+            request.remote_addr is not None
+            and geoip_reader.country(request.remote_addr).country.iso_code != "LT"
+        ):
+            return text("requests from non-lithuanian IPs are restricted", 403)
+    except Exception:
+        pass
+
     content: str = request.values.get("data", "")
 
     if not content:
