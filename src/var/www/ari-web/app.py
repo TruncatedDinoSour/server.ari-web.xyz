@@ -14,8 +14,6 @@ from shutil import copyfile
 from urllib.parse import urlencode
 from warnings import filterwarnings as filter_warnings
 
-import geoip2
-import geoip2.database
 import sqlalchemy  # type: ignore
 from flask import redirect  # type: ignore
 from flask import Flask, Response, g, jsonify, request
@@ -47,7 +45,6 @@ COUNT = open(".counter.dat", "r+")
 RAND: SystemRandom = SystemRandom()
 
 app: Flask = Flask(__name__)
-geoip_reader: geoip2.database.Reader = geoip2.database.Reader("GeoLite2-Country.mmdb")
 
 app.config.update(  # type: ignore
     {
@@ -212,30 +209,6 @@ class AnonMsg(BASE):  # type: ignore
 
     def __init__(self, content: str) -> None:
         self.ip = hash_ip(request.remote_addr)  # type: ignore
-        self.content = content  # type: ignore
-
-
-class Store(BASE):  # type: ignore
-    __tablename__: str = "store"
-
-    id: sqlalchemy.Column[int] = sqlalchemy.Column(
-        sqlalchemy.INTEGER,
-        unique=True,
-        primary_key=True,
-    )
-
-    ts: sqlalchemy.Column[int] = sqlalchemy.Column(
-        sqlalchemy.INTEGER,
-    )
-
-    content: sqlalchemy.Column[str] = sqlalchemy.Column(
-        sqlalchemy.String,
-        nullable=False,
-    )
-
-    def __init__(self, content: str) -> None:
-        self.content = content  # type: ignore
-        self.ts = round(datetime.utcnow().timestamp())  # type: ignore
         self.content = content  # type: ignore
 
 
@@ -485,28 +458,6 @@ def visit() -> Response:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="20"><text x="{svg_width / 2}" y="20" font-size="20px" fill="white" text-anchor="middle" font-family="sans-serif">{count}</text></svg>',
         mimetype="image/svg+xml",
     )
-
-
-@app.post("/store")
-def store() -> Response:
-    try:
-        if (
-            request.remote_addr is not None
-            and geoip_reader.country(request.remote_addr).country.iso_code != "LT"
-        ):
-            return text("requests from non-lithuanian IPs are restricted", 403)
-    except Exception:
-        pass
-
-    content: str = request.values.get("data", "")
-
-    if not content:
-        return text("duomenų nerasta jūsų užklausoje", 400)
-
-    SESSION.add(sql := Store(content))  # type: ignore
-    SESSION.commit()  # type: ignore
-
-    return text(f"jūsų duomenys užregistruoti su ID {sql.id}")
 
 
 @app.get("/favicon.ico")

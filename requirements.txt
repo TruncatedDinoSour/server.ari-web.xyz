@@ -1,4 +1,3 @@
 sqlalchemy
 flask
 Flask_Limit==1.0.3
-geoip2
